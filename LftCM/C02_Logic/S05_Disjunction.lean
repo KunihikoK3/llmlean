@@ -2,6 +2,7 @@ import Mathlib
 import LeanCopilot
 import Lean
 import Paperproof
+import LLMlean
 
 namespace C03S05
 
@@ -128,6 +129,13 @@ example {m n k : ℕ} (h : m ∣ n ∨ m ∣ k) : m ∣ n * k := by
 
 example {z : ℝ} (h : ∃ x y, z = x ^ 2 + y ^ 2 ∨ z = x ^ 2 + y ^ 2 + 1) : z ≥ 0 := by
   rcases h with ⟨x, y, rfl | rfl⟩
+  /-Pattern Matching:
+  ⟨x, y, rfl | rfl⟩ breaks down as follows:
+  ⟨x, y⟩ extracts the witnesses x and y from the existential quantifier.
+  rfl | rfl handles the disjunction z = x^2 + y^2 ∨ z = x^2 + y^2 + 1 by creating two cases:
+  Case 1: z = x^2 + y^2
+  Case 2: z = x^2 + y^2 + 1
+  -/
   · linarith [pow_two_nonneg x, pow_two_nonneg y]
   · linarith [pow_two_nonneg x, pow_two_nonneg y]
 
@@ -164,7 +172,16 @@ example (h : x ^ 2 = 1) : x = 1 ∨ x = -1 := by
 
 
 example (h : x ^ 2 = y ^ 2) : x = y ∨ x = -y := by
-  sorry
+  have h' : x ^ 2 - y ^ 2 = 0 := by rw [h, sub_self]
+  have h'' : (x - y) * (x + y) = 0 := by
+    rw [← h']
+    ring
+  rcases eq_zero_or_eq_zero_of_mul_eq_zero h'' with h1 | h1
+  · left
+    exact eq_of_sub_eq_zero h1
+  · right
+    exact eq_neg_iff_add_eq_zero.mpr h1
+
 
 end
 

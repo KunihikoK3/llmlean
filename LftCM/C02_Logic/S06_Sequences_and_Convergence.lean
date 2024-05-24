@@ -1,12 +1,16 @@
-import LftCM.Common
-import Mathlib.Data.Real.Basic
+import Mathlib
+import LeanCopilot
+import Lean
+import Paperproof
+import LLMlean
+
 
 namespace C03S06
 
 def ConvergesTo (s : ℕ → ℝ) (a : ℝ) :=
   ∀ ε > 0, ∃ N, ∀ n ≥ N, |s n - a| < ε
 
-example : (fun x y : ℝ ↦ (x + y) ^ 2) = fun x y : ℝ ↦ x ^ 2 + 2 * x * y + y ^ 2 := by
+example : (fun x y : ℝ ↦ (x + y) ^ 2 )= fun x y : ℝ ↦ x ^ 2 + 2 * x * y + y ^ 2 := by
   ext
   ring
 
@@ -19,23 +23,66 @@ example {a : ℝ} (h : 1 < a) : a < a * a := by
   · rw [one_mul]
   exact lt_trans zero_lt_one h
 
-theorem convergesTo_const (a : ℝ) : ConvergesTo (fun x : ℕ ↦ a) a := by
+
+theorem convergesTo_const (a : ℝ) : ConvergesTo (fun ℕ ↦ a) a := by
   intro ε εpos
+  -- intro ε εpos introduces the variable ε and the assumption ε > 0 to the context.
   use 0
-  intro n nge
-  rw [sub_self, abs_zero]
-  apply εpos
+  -- ConvergesTo contains a *existential* quantifier, so we instantiate it by applying the use tactic.
+  intro n
+  -- goal contains a *universal* quantifier, so we instantiate it by applying the intro tactic.
+  dsimp
+  -- dsimp simplifies the goal by expanding the definition of the function.
+  simpa using εpos
+  -- rw [sub_self, abs_zero]
+  -- apply εpos
 
 theorem convergesTo_add {s t : ℕ → ℝ} {a b : ℝ}
       (cs : ConvergesTo s a) (ct : ConvergesTo t b) :
     ConvergesTo (fun n ↦ s n + t n) (a + b) := by
   intro ε εpos
   dsimp -- this line is not needed but cleans up the goal a bit.
+  -- dsimp simplifies the goal by expanding the definition of the function.
   have ε2pos : 0 < ε / 2 := by linarith
   rcases cs (ε / 2) ε2pos with ⟨Ns, hs⟩
+  -- destructure the cs hypothesis with ε / 2 and ε2pos to get a suitable Ns and hs.
   rcases ct (ε / 2) ε2pos with ⟨Nt, ht⟩
   use max Ns Nt
-  sorry
+  intro n nge
+  have h1 : |s n - a| < ε / 2 := by
+    apply hs
+    aesop
+  have h2 : |t n - b| < ε / 2 := by
+    apply ht
+    aesop
+  have h3 : |s n + t n - (a + b)| = |(s n - a) + (t n - b)| := by
+    congr
+    ring
+  have h4 := add_lt_add h1 h2
+  have h5 : |(s n - a) + (t n - b)| ≤ |s n - a| + |t n - b| := by
+    exact abs_add_le _ _
+  linarith
+
+
+example {s t : ℕ → ℝ} {a b : ℝ} (cs : ConvergesTo s a) (ct : ConvergesTo t b) :ConvergesTo (fun n ↦ s n + t n) (a + b) := by
+    intro ε εpos
+    dsimp -- this line is not needed but cleans up the goal a bit.
+    have ε2pos : 0 < ε / 2 := by linarith
+    rcases cs (ε / 2) ε2pos with ⟨Ns, hs⟩
+    rcases ct (ε / 2) ε2pos with ⟨Nt, ht⟩
+    use max Ns Nt
+    intro n nge
+    have h1 : |s n - a| < ε / 2 := by
+      apply hs
+      aesop
+    have h2 : |t n - b| < ε / 2 := by
+      apply ht
+      aesop
+    calc
+    |s n + t n - (a + b)| = |(s n - a) + (t n - b)| := by congr; ring
+      _ ≤ |s n - a| + |t n - b| := by exact abs_add_le _ _
+      _ < ε / 2 + ε / 2 := by linarith
+      _ = ε := by ring
 
 theorem convergesTo_mul_const {s : ℕ → ℝ} {a : ℝ} (c : ℝ) (cs : ConvergesTo s a) :
     ConvergesTo (fun n ↦ c * s n) (c * a) := by
@@ -100,4 +147,3 @@ def ConvergesTo' (s : α → ℝ) (a : ℝ) :=
   ∀ ε > 0, ∃ N, ∀ n ≥ N, |s n - a| < ε
 
 end
-
