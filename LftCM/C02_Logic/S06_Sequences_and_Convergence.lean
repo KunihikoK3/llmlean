@@ -93,13 +93,53 @@ theorem convergesTo_mul_const {s : ℕ → ℝ} {a : ℝ} (c : ℝ) (cs : Conver
     rw [h]
     ring
   have acpos : 0 < |c| := abs_pos.mpr h
-  sorry
+  intro ε εpos
+  dsimp
+  rcases cs (ε / |c|) (div_pos εpos acpos) with ⟨N, h⟩
+  /- The line `rcases cs (ε / |c|) (div_pos εpos acpos) with ⟨N, h⟩` can be broken down as follows:
+
+  1. **`cs (ε / |c|) (div_pos εpos acpos)`**:
+   - `cs` is the hypothesis that the sequence $$ s $$ converges to $$ a $$.
+   - We apply `cs` to $$ \varepsilon / |c| $$ and the proof that $$ \varepsilon / |c| > 0 $$ (which is `div_pos εpos acpos`).
+
+  2. **`rcases ... with ⟨N, h⟩`**:
+   - `rcases` is a tactic used for case analysis and destructuring.
+   - This extracts the witness $$ N $$ and the proof `h` that for all $$ n \ge N $$, $$ |s n - a| < \varepsilon / |c| $$.
+
+  This step is crucial because it allows us to use the convergence of $$ s $$ to $$ a $$ to show the convergence of $$ c \cdot s $$ to $$ c \cdot a $$.
+  -/
+  use N
+  intro n nge
+  calc
+  |c * s n - c * a| = |c * (s n - a)| := by congr; ring
+  _ = |c| * |s n - a| := by rw [abs_mul]
+  _ < |c| * (ε / |c|) := by exact (mul_lt_mul_left acpos).mpr (h n nge)
+  _ = ε := by field_simp [mul_comm]
+
+/-
+The theorem `convergesTo_mul_const` states that if a sequence \( s \) converges to \( a \), then the sequence obtained by multiplying each term of \( s \) by a constant \( c \) converges to \( c \cdot a \). The proof is structured as follows:
+
+1. **Case \( c = 0 \)**:
+   - If \( c = 0 \), then the sequence \( \lambda n, c \cdot s n \) is just the constant sequence \( 0 \), which converges to \( 0 \). This is handled by converting the goal to `convergesTo_const 0` and using the `ring` tactic to simplify.
+
+2. **Case \( c \neq 0 \)**:
+   - We first establish that \( |c| > 0 \) using `abs_pos.mpr h`.
+   - We then introduce \( \varepsilon \) and assume \( \varepsilon > 0 \).
+   - We need to show that \( \lambda n, c \cdot s n \) converges to \( c \cdot a \). For this, we use the fact that \( s \) converges to \( a \).
+   - We find \( N \) such that for all \( n \ge N \), \( |s n - a| < \varepsilon / |c| \).
+   - We then show that for all \( n \ge N \), \( |c \cdot s n - c \cdot a| < \varepsilon \) by manipulating the inequality and using properties of absolute values and multiplication.
+
+-/
 
 theorem exists_abs_le_of_convergesTo {s : ℕ → ℝ} {a : ℝ} (cs : ConvergesTo s a) :
     ∃ N b, ∀ n, N ≤ n → |s n| < b := by
   rcases cs 1 zero_lt_one with ⟨N, h⟩
   use N, |a| + 1
-  sorry
+  intro n nge
+  calc |s n| = |s n - a + a| := by congr; ring
+  _ ≤ |s n - a| + |a| := by exact abs_add_le _ _
+  _ < 1 + |a| := by exact add_lt_add_right (h n nge) _
+  _ = |a| + 1 := by ring
 
 theorem aux {s t : ℕ → ℝ} {a : ℝ} (cs : ConvergesTo s a) (ct : ConvergesTo t 0) :
     ConvergesTo (fun n ↦ s n * t n) 0 := by
@@ -109,7 +149,50 @@ theorem aux {s t : ℕ → ℝ} {a : ℝ} (cs : ConvergesTo s a) (ct : Converges
   have Bpos : 0 < B := lt_of_le_of_lt (abs_nonneg _) (h₀ N₀ (le_refl _))
   have pos₀ : ε / B > 0 := div_pos εpos Bpos
   rcases ct _ pos₀ with ⟨N₁, h₁⟩
-  sorry
+  use max N₀ N₁
+  intro n nge
+  have h₂ : |s n| < B := by
+    apply h₀
+    exact le_of_max_le_left nge
+  have h₃ : |t n - 0| < ε / B := by
+    congr
+    apply h₁
+    exact le_of_max_le_right nge
+  -- have h₄ : |s n * t n - 0| = |s n * t n| := by congr; ring
+  have h₅ : |s n * t n| = |s n| * |t n| := by rw [abs_mul]
+  have h₆ : |t n - 0| = |t n| := by rw [sub_zero]
+  have h₇ : |t n| < ε / B := by rwa [← h₆]
+  have h₈ : |s n| * |t n| < B * (ε / B) := by gcongr
+  simp only [tsub_zero]
+  have h₉ : B * (ε / B) = ε := by field_simp [mul_comm]
+  linarith
+
+example {s t : ℕ → ℝ} {a : ℝ} (cs : ConvergesTo s a) (ct : ConvergesTo t 0) :
+    ConvergesTo (fun n ↦ s n * t n) 0 := by
+  intro ε εpos
+  dsimp
+  rcases exists_abs_le_of_convergesTo cs with ⟨N₀, B, h₀⟩
+  have Bpos : 0 < B := lt_of_le_of_lt (abs_nonneg _) (h₀ N₀ (le_refl _))
+  have pos₀ : ε / B > 0 := div_pos εpos Bpos
+  rcases ct (ε / B) pos₀ with ⟨N₁, h₁⟩
+  use max N₀ N₁
+  intro n nge
+  have h₂ : |s n| < B := by
+    apply h₀
+    exact le_of_max_le_left nge
+  have h₃ : |t n - 0| < ε / B := by
+    apply h₁
+    exact le_of_max_le_right nge
+  calc
+    |s n * t n - 0| = |s n * t n| := by rw [sub_zero]
+    _ = |s n| * |t n| := by rw [abs_mul]
+    _ = |s n| * |t n - 0| := by rw [sub_zero]
+    _ < B * (ε / B) := by gcongr
+    _ = ε := by field_simp [mul_comm]
+
+
+
+
 
 theorem convergesTo_mul {s t : ℕ → ℝ} {a b : ℝ}
       (cs : ConvergesTo s a) (ct : ConvergesTo t b) :
@@ -127,7 +210,17 @@ theorem convergesTo_unique {s : ℕ → ℝ} {a b : ℝ}
       (sa : ConvergesTo s a) (sb : ConvergesTo s b) :
     a = b := by
   by_contra abne
-  have : |a - b| > 0 := by sorry
+  have h': |a - b| > 0 := by
+    have h₁ : a ≠ b := by
+      intro h
+      apply abne
+      exact h
+    have h₂ : a - b ≠ 0 := by
+      rw [sub_eq_add_neg]
+      have h₃ : a + -b = a - b := by ring
+      rw [h₃]
+      rwa [sub_ne_zero]
+    exact abs_pos.mpr h₂
   let ε := |a - b| / 2
   have εpos : ε > 0 := by
     change |a - b| / 2 > 0
@@ -135,10 +228,22 @@ theorem convergesTo_unique {s : ℕ → ℝ} {a b : ℝ}
   rcases sa ε εpos with ⟨Na, hNa⟩
   rcases sb ε εpos with ⟨Nb, hNb⟩
   let N := max Na Nb
-  have absa : |s N - a| < ε := by sorry
-  have absb : |s N - b| < ε := by sorry
-  have : |a - b| < |a - b| := by sorry
-  exact lt_irrefl _ this
+  have absa : |s N - a| < ε := by
+    apply hNa
+    exact le_of_max_le_left (le_refl _)
+  have absb : |s N - b| < ε := by
+    apply hNb
+    exact le_of_max_le_right (le_refl _)
+  have h'': |a - b| < |a - b| := by
+    calc
+    |a - b| = |a - s N + s N - b| := by congr; ring
+    _ = |(a - s N) + (s N - b)| := by congr; ring
+    _ ≤  |a - s N| + |s N - b| := by exact abs_add_le _ _
+    _ = |-(a - s N)| + |s N - b| := by rw [abs_neg]
+    _ = |s N - a| + |s N - b| := by simp
+    _ < ε + ε := by linarith
+    _ = |a - b| := by ring
+  linarith
 
 section
 variable {α : Type*} [LinearOrder α]
