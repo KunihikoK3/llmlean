@@ -1,15 +1,16 @@
-import Mathlib.Data.Set.Lattice
-import Mathlib.Data.Nat.Prime
-import Mathlib.Data.Nat.Parity
-import LftCM.Common
+import Mathlib
+import LeanCopilot
+import Lean
+import Paperproof
+import LLMlean
 
 -- .. _sets:
--- 
+--
 -- Sets
 -- ----
--- 
+--
 -- .. index:: set operations
--- 
+--
 -- If ``α`` is any type, the type ``Set α`` consists of sets
 -- of elements of ``α``.
 -- This type supports the usual set-theoretic operations and relations.
@@ -28,9 +29,9 @@ import LftCM.Common
 -- in their name.
 -- The expression ``x ∉ s`` abbreviates ``¬ x ∈ s``.
 -- You can type ``∈`` as ``\in`` or ``\mem`` and ``∉`` as ``\notin``.
--- 
+--
 -- .. index:: simp, tactics ; simp
--- 
+--
 -- One way to prove things about sets is to use ``rw``
 -- or the simplifier to expand the definitions.
 -- In the second example below, we use ``simp only``
@@ -48,10 +49,25 @@ open Set
 
 example (h : s ⊆ t) : s ∩ u ⊆ t ∩ u := by
   rw [subset_def, inter_def, inter_def]
+  /-`rw` is the rewrite tactic, which replaces terms using given equalities or definitions.
+  `subset_def` rewrites \( s \subseteq t \) as \( \forall x, x \in s \rightarrow x \in t \).
+  `inter_def` rewrites \( s \cap u \) as \( \{ x \mid x \in s \land x \in u \} \).
+  This line rewrites the goal and the hypothesis using these definitions.
+  -/
   rw [subset_def] at h
+  /-This line rewrites the hypothesis \( h \) using the definition of subset, so \( h \) becomes \( \forall x, x \in s \rightarrow x \in t \).
+  -/
   simp only [mem_setOf]
+  /-`simp only` simplifies expressions using the given list of lemmas or definitions.
+  `mem_setOf` simplifies membership in a set defined by a property, i.e., \( x \in \{ y \mid P(y) \} \) becomes \( P(x) \).-/
   rintro x ⟨xs, xu⟩
+  /-`rintro` is a combination of `intro` and `cases`, which introduces a variable and simultaneously destructures a hypothesis. This line introduces \( x \) and assumes \( x \in s \cap u \), which gives us \( x \in s \) (denoted as `xs`) and \( x \in u \) (denoted as `xu`).
+  -/
   exact ⟨h _ xs, xu⟩
+  /-`exact` provides the exact term needed to prove the goal.
+  `h _ xs` applies the hypothesis \( h \) to \( x \in s \) (i.e., `xs`), giving \( x \in t \).
+  `⟨h _ xs, xu⟩` constructs the pair \((x \in t, x \in u)\), which is exactly \( x \in t \cap u \).
+  -/
 
 example (h : s ⊆ t) : s ∩ u ⊆ t ∩ u := by
   simp only [subset_def, mem_inter_iff] at *
@@ -60,7 +76,7 @@ example (h : s ⊆ t) : s ∩ u ⊆ t ∩ u := by
 
 -- In this example, we open the ``set`` namespace to have
 -- access to the shorter names for the theorems.
--- But, in fact, we can delete the calls to ``rw`` and ``simp``
+-- But, in fact, *we can delete the calls to ``rw`` and ``simp``*
 -- entirely:
 example (h : s ⊆ t) : s ∩ u ⊆ t ∩ u := by
   intro x xsu
@@ -82,7 +98,7 @@ example (h : s ⊆ t) : s ∩ u ⊆ t ∩ u :=
 -- too heavily.
 -- It is often convenient,
 -- but sometimes we have to fall back on unfolding definitions manually.
--- 
+--
 -- To deal with unions, we can use ``Set.union_def`` and ``Set.mem_union``.
 -- Since ``x ∈ s ∪ t`` unfolds to ``x ∈ s ∨ x ∈ t``,
 -- we can also use the ``cases`` tactic to force a definitional reduction.
@@ -109,11 +125,17 @@ example : s ∩ (t ∪ u) ⊆ s ∩ t ∪ s ∩ u := by
 
 -- As an exercise, try proving the other inclusion:
 example : s ∩ t ∪ s ∩ u ⊆ s ∩ (t ∪ u) := by
-  sorry
+  intro x h
+  rcases h with xst | xsu
+  · show x ∈ s ∩ (t ∪ u)
+    exact ⟨xst.1, Or.inl xst.2⟩
+  . show x ∈ s ∩ (t ∪ u)
+    exact ⟨xsu.1, Or.inr xsu.2⟩
+
 -- It might help to know that when using ``rintro``,
 -- sometimes we need to use parentheses around a disjunctive pattern
 -- ``h1 | h2`` to get Lean to parse it correctly.
--- 
+--
 -- The library also defines set difference, ``s \ t``,
 -- where the backslash is a special unicode character
 -- entered as ``\\``.
@@ -143,11 +165,24 @@ example : (s \ t) \ u ⊆ s \ (t ∪ u) := by
 
 -- As an exercise, prove the reverse inclusion:
 example : s \ (t ∪ u) ⊆ (s \ t) \ u := by
-  sorry
+  rintro x ⟨xs, xnt⟩
+  constructor
+  · constructor
+    · exact xs
+    · intro xu
+      simp_all only [mem_union,
+        true_or,
+        not_true_eq_false]
+  · intro xu
+    have nxu : x ∉ u := fun h => xnt (Or.inr h)
+    exact nxu xu
+
+
+
 -- To prove that two sets are equal,
 -- it suffices to show that every element of one is an element
 -- of the other.
--- This principle is known as "extensionality,"
+-- *This principle is known as "extensionality,"*
 -- and, unsurprisingly,
 -- the ``ext`` tactic is equipped to handle it.
 example : s ∩ t = t ∩ s := by
@@ -179,24 +214,62 @@ example : s ∩ t = t ∩ s := by
 
 -- Try finishing this proof term:
 example : s ∩ t = t ∩ s :=
-    Subset.antisymm sorry sorry
+    Subset.antisymm (fun x ⟨xs, xt⟩ ↦ ⟨xt, xs⟩) (fun x ⟨xt, xs⟩ ↦ ⟨xs, xt⟩)
 -- Remember that you can replace `sorry` by an underscore,
 -- and when you hover over it,
 -- Lean will show you what it expects at that point.
--- 
+--
 -- Here are some set-theoretic identities you might enjoy proving:
 example : s ∩ (s ∪ t) = s := by
-  sorry
+  ext x
+  simp
+  intro h
+  constructor
+  · assumption
 
 example : s ∪ s ∩ t = s := by
-  sorry
+  ext x
+  simp
+  intro h
+  exact fun _ => h
+
+
 
 example : s \ t ∪ t = s ∪ t := by
-  sorry
+  ext x
+  simp
+
 
 example : s \ t ∪ t \ s = (s ∪ t) \ (s ∩ t) := by
-  sorry
+  ext x
+  simp
+  aesop
 
+
+
+
+example : s \ t ∪ t \ s = (s ∪ t) \ (s ∩ t) := by
+  ext x; constructor
+  · rintro (⟨xs, xnt⟩ | ⟨xt, xns⟩)
+    · constructor
+      left
+      exact xs
+      rintro ⟨_, xt⟩
+      contradiction
+    . constructor
+      right
+      exact xt
+      rintro ⟨xs, _⟩
+      contradiction
+  rintro ⟨xs | xt, nxst⟩
+  · left
+    use xs
+    intro xt
+    apply nxst
+    constructor <;> assumption
+  . right; use xt; intro xs
+    apply nxst
+    constructor <;> assumption
 -- When it comes to representing sets,
 -- here is what is going on underneath the hood.
 -- In type theory, a *property* or *predicate* on a type ``α``
@@ -206,7 +279,7 @@ example : s \ t ∪ t \ s = (s ∪ t) \ (s ∩ t) := by
 -- that ``P`` holds of ``a``.
 -- In the library, ``Set α`` is defined to be ``α → Prop`` and ``x ∈ s`` is defined to be ``s x``.
 -- In other words, sets are really properties, treated as objects.
--- 
+--
 -- The library also defines set-builder notation.
 -- The expression ``{ y | P y }`` unfolds to ``(fun y ↦ P y)``,
 -- so ``x ∈ { y | P y }`` reduces to ``P x``.
@@ -227,14 +300,14 @@ example : evens ∪ odds = univ := by
 -- you understand what is going on.
 -- Try deleting the line ``rw [evens, odds]``
 -- and confirm that the proof still works.
--- 
+--
 -- In fact, set-builder notation is used to define
--- 
+--
 -- - ``s ∩ t`` as ``{x | x ∈ s ∧ x ∈ t}``,
 -- - ``s ∪ t`` as ``{x | x ∈ s ∨ x ∈ t}``,
 -- - ``∅`` as ``{x | False}``, and
 -- - ``univ`` as ``{x | True}``.
--- 
+--
 -- We often need to indicate the type of ``∅`` and ``univ``
 -- explicitly,
 -- because Lean has trouble guessing which ones we mean.
@@ -274,7 +347,7 @@ example (n : ℕ) (h : Prime n) : Nat.Prime n := by
   exact h
 
 -- .. index:: rwa, tactics ; rwa
--- 
+--
 -- The `rwa` tactic follows a rewrite with the assumption tactic.
 example (n : ℕ) (h : Prime n) : Nat.Prime n := by
   rwa [Nat.prime_iff]
@@ -282,7 +355,7 @@ example (n : ℕ) (h : Prime n) : Nat.Prime n := by
 end
 
 -- .. index:: bounded quantifiers
--- 
+--
 -- Lean introduces the notation ``∀ x ∈ s, ...``,
 -- "for every ``x`` in ``s`` .,"
 -- as an abbreviation for  ``∀ x, x ∈ s → ...``.
@@ -375,7 +448,7 @@ example : (⋂ i, A i ∩ B i) = (⋂ i, A i) ∩ ⋂ i, B i := by
 -- indexed union or intersection because,
 -- as with the quantifiers,
 -- the scope of the bound variable extends as far as it can.
--- 
+--
 -- Try proving the following identity.
 -- One direction requires classical logic!
 -- We recommend using ``by_cases xs : x ∈ s``
